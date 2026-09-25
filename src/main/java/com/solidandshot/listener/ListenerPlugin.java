@@ -14,10 +14,13 @@ public final class ListenerPlugin extends JavaPlugin {
 
         manager = new ListenerManager(this);
         getServer().getPluginManager().registerEvents(new BukkitEventListener(manager), this);
+        ListenerGui gui = new ListenerGui(this, manager);
+        getServer().getPluginManager().registerEvents(gui, this);
 
         PluginCommand command = getCommand("listener");
         if (command != null) {
             ListenerCommand executor = new ListenerCommand(this, manager);
+            executor.setGui(gui);
             command.setExecutor(executor);
             command.setTabCompleter(executor);
         } else {

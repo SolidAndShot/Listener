@@ -11,7 +11,7 @@ softdepend: [PlaceholderAPI]
 commands:
   listener:
     description: 管理监听器规则
-    usage: /listener <list|info|reload|test|fire>
+    usage: /listener <gui|list|info|reload|test|fire>
     aliases: [listeners]
     permission: listener.admin
 

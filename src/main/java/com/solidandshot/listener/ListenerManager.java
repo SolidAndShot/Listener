@@ -132,6 +132,68 @@ public final class ListenerManager {
         return definitions;
     }
 
+    /**
+     * Persists one rule edited by the in-game administrator GUI.
+     * Keeping this operation here makes GUI and command/config reloads share the
+     * same validation and timer lifecycle.
+     */
+    public synchronized boolean saveRule(String id, String event, boolean enabled,
+                                         Map<String, String> filters, List<ActionSpec> actions,
+                                         long intervalTicks) {
+        if (id == null || id.isBlank() || event == null || event.isBlank() || actions == null || actions.isEmpty()) {
+            return false;
+        }
+        String safeId = id.trim();
+        String safeEvent = normalize(event);
+        if (safeId.length() > 64 || safeEvent.length() > 128 || !safeId.matches("[A-Za-z0-9_-]+")) {
+            return false;
+        }
+        List<Map<String, Object>> serializedActions = new ArrayList<>();
+        if (actions.size() > 64) return false;
+        for (ActionSpec action : actions) {
+            if (action == null || action.type() == null || action.type().isBlank()) continue;
+            String actionType = normalize(action.type());
+            String actionValue = Objects.requireNonNullElse(action.value(), "");
+            if (actionType.length() > 64 || actionValue.length() > 4096
+                    || action.delayTicks() < 0 || action.delayTicks() > 2_000_000) return false;
+            Map<String, Object> serialized = new LinkedHashMap<>();
+            serialized.put("type", actionType);
+            serialized.put("value", actionValue);
+            if (action.delayTicks() > 0) serialized.put("delay_ticks", action.delayTicks());
+            serializedActions.add(serialized);
+        }
+        if (serializedActions.isEmpty()) return false;
+        Map<String, String> safeFilters = new LinkedHashMap<>();
+        if (filters != null) {
+            if (filters.size() > 64) return false;
+            for (Map.Entry<String, String> entry : filters.entrySet()) {
+                String key = Objects.requireNonNullElse(entry.getKey(), "");
+                String value = Objects.requireNonNullElse(entry.getValue(), "");
+                if (key.isBlank() || key.length() > 128 || value.length() > 4096) return false;
+                safeFilters.put(key, value);
+            }
+        }
+        String path = "listeners." + safeId;
+        plugin.getConfig().set(path + ".event", safeEvent);
+        plugin.getConfig().set(path + ".enabled", enabled);
+        plugin.getConfig().set(path + ".interval_ticks", Math.max(1L, Math.min(2_000_000L, intervalTicks)));
+        plugin.getConfig().set(path + ".filters", safeFilters);
+        plugin.getConfig().set(path + ".actions", serializedActions);
+        plugin.saveConfig();
+        reload();
+        return definitions.containsKey(safeId);
+    }
+
+    /** Toggle a rule and persist it without changing its other fields. */
+    public synchronized boolean setEnabled(String id, boolean enabled) {
+        ListenerDefinition definition = definitions.get(id);
+        if (definition == null) return false;
+        plugin.getConfig().set("listeners." + id + ".enabled", enabled);
+        plugin.saveConfig();
+        reload();
+        return true;
+    }
+
     private void scheduleAction(ListenerDefinition definition, ActionSpec action, EventContext context) {
         Runnable runnable = () -> executeAction(definition, action, context);
         Player player = context.player();

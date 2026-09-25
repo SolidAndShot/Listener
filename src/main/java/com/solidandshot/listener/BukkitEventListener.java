@@ -55,6 +55,9 @@ public final class BukkitEventListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChat(AsyncPlayerChatEvent event) {
+        // The GUI editor consumes administrator chat prompts. Do not dispatch
+        // a cancelled chat message as a normal player_chat listener event.
+        if (event.isCancelled()) return;
         manager.dispatch(context("player_chat", event.getPlayer(), Map.of(
                 "message", safe(event.getMessage()),
                 "format", safe(event.getFormat())

@@ -19,10 +19,15 @@ public final class ListenerCommand implements CommandExecutor, TabCompleter {
 
     private final JavaPlugin plugin;
     private final ListenerManager manager;
+    private ListenerGui gui;
 
     public ListenerCommand(JavaPlugin plugin, ListenerManager manager) {
         this.plugin = plugin;
         this.manager = manager;
+    }
+
+    public void setGui(ListenerGui gui) {
+        this.gui = gui;
     }
 
     @Override
@@ -33,6 +38,7 @@ public final class ListenerCommand implements CommandExecutor, TabCompleter {
         }
         String subcommand = args.length == 0 ? "list" : args[0].toLowerCase(Locale.ROOT);
         switch (subcommand) {
+            case "gui", "editor", "edit" -> openGui(sender);
             case "list" -> list(sender);
             case "info" -> info(sender, args);
             case "reload" -> reload(sender);
@@ -40,6 +46,18 @@ public final class ListenerCommand implements CommandExecutor, TabCompleter {
             default -> usage(sender, label);
         }
         return true;
+    }
+
+    private void openGui(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.RED + "图形化编辑器需要由玩家执行。");
+            return;
+        }
+        if (gui == null) {
+            sender.sendMessage(ChatColor.RED + "图形化编辑器尚未初始化。");
+            return;
+        }
+        gui.openMain(player);
     }
 
     private void list(CommandSender sender) {
@@ -100,13 +118,13 @@ public final class ListenerCommand implements CommandExecutor, TabCompleter {
     }
 
     private void usage(CommandSender sender, String label) {
-        sender.sendMessage(ChatColor.YELLOW + "用法: /" + label + " <list|info|reload|test|fire>");
+        sender.sendMessage(ChatColor.YELLOW + "用法: /" + label + " <gui|list|info|reload|test|fire>");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> values = List.of("list", "info", "reload", "test", "fire");
+            List<String> values = List.of("gui", "list", "info", "reload", "test", "fire");
             return partial(values, args[0]);
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("info")
