@@ -71,7 +71,9 @@ public final class ClientBridge implements PluginMessageListener {
 
     /** Sends an arbitrary client action. Unknown action names are left to the mod. */
     public boolean sendAction(Player player, String action, String value) {
-        if (player == null || !player.isOnline() || !validName(action)) return false;
+        if (player == null || !player.isOnline() || !clients.containsKey(player.getUniqueId()) || !validName(action)) {
+            return false;
+        }
         try {
             byte[] payload = frame(OP_ACTION, out -> {
                 out.writeUTF(action);

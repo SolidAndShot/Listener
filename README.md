@@ -172,12 +172,12 @@ listeners:
         value: "inventory"
 
   show_overlay:
-    event: player_join
+    event: client_connect
     actions:
       - type: client_overlay
         value: "欢迎，%player_name%！"
 ```
 
-可用动作包括 `client_action`（值格式为 `动作名|参数`）以及便捷别名 `client_message`、`client_screen`、`client_overlay`、`client_sound`。这些动作只有在玩家安装并启用兼容客户端 Mod 时才会显示效果。
+可用动作包括 `client_action`（值格式为 `动作名|参数`）以及便捷别名 `client_message`、`client_screen`、`client_overlay`、`client_sound`。这些动作只有在玩家安装兼容客户端 Mod 并完成握手后才会发送；首次进入时请用 `client_connect` 触发欢迎动作。
 
 安全提示：客户端事件由玩家客户端自行上报，不能作为管理员签名或反作弊凭据。不要仅凭 `client_*` 事件执行踢人、封禁、权限变更等高权限控制台命令。
