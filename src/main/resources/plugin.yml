@@ -1,0 +1,21 @@
+name: Listener
+version: '${version}'
+main: com.solidandshot.listener.ListenerPlugin
+api-version: '26.2'
+folia-supported: true
+author: SolidAndShot
+prefix: 监听器
+description: 可配置的 Minecraft 服务器监听器与动作脚本插件
+softdepend: [PlaceholderAPI]
+
+commands:
+  listener:
+    description: 管理监听器规则
+    usage: /listener <list|info|reload|test|fire>
+    aliases: [listeners]
+    permission: listener.admin
+
+permissions:
+  listener.admin:
+    description: 管理监听器规则
+    default: op

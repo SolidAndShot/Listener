@@ -1,0 +1,50 @@
+# 监听器插件配置。修改后执行 /listener reload。
+# event 可用值：server_start、timer、player_join、player_quit、player_chat、player_command、
+# player_death、player_damage、player_move、block_break、block_place、player_interact、
+# item_consume、item_pickup、entity_spawn、entity_death、world_change、weather_change。
+# action 可用值：message、broadcast、console_command、player_command、actionbar、title、sound、
+# set_variable、log。
+# sound 的 value 格式为 minecraft:block.note_block.chime,1.0,1.0（资源名、音量、音调）。
+# 所有动作 value 都支持 %player_name%、%uuid%、%world%、%x%、%y%、%z%、%message%、%command%、
+# %block%、%item%、%entity%、%damage%、%event%、%listener_id% 等变量；安装 PlaceholderAPI 后
+# 会自动继续解析 PlaceholderAPI 变量。
+
+listeners:
+  welcome:
+    event: player_join
+    enabled: true
+    actions:
+      - type: message
+        value: "&a欢迎回来，%player_name%！"
+
+  join_log:
+    event: player_join
+    enabled: true
+    actions:
+      - type: log
+        value: "玩家 %player_name% 加入了服务器。"
+
+  death_message:
+    event: player_death
+    enabled: true
+    actions:
+      - type: broadcast
+        value: "&c%player_name% 被淘汰了。"
+
+  break_log:
+    event: block_break
+    enabled: false
+    filters:
+      world: "*"
+      block: "minecraft:stone"
+    actions:
+      - type: log
+        value: "%player_name% 挖掘了 %block%。"
+
+  heartbeat:
+    event: timer
+    enabled: false
+    interval_ticks: 1200
+    actions:
+      - type: broadcast
+        value: "&e服务器运行正常。"
