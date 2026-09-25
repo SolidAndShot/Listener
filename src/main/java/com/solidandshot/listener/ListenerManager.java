@@ -227,8 +227,13 @@ public final class ListenerManager {
         for (Map.Entry<String, String> entry : filters.entrySet()) {
             String expected = entry.getValue();
             if (expected.isBlank() || expected.equals("*")) continue;
-            String actual = context.get(entry.getKey());
-            if (entry.getKey().endsWith("_contains")) {
+            String filterKey = entry.getKey();
+            boolean contains = filterKey.endsWith("_contains");
+            String actualKey = contains
+                    ? filterKey.substring(0, filterKey.length() - "_contains".length())
+                    : filterKey;
+            String actual = context.get(actualKey);
+            if (contains) {
                 if (actual == null || !actual.toLowerCase().contains(expected.toLowerCase())) return false;
             } else if (actual == null || !expected.equalsIgnoreCase(actual)) {
                 return false;

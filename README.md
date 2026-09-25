@@ -26,6 +26,17 @@ build/libs/Listener-1.0.0.jar
 
 将 JAR 放入服务器 `plugins` 目录后完整重启。首次启动会生成 `plugins/Listener/config.yml`。
 
+## 使用教程
+
+完整的中文教程（安装、配置结构、事件过滤器、动作、变量、常见示例和故障排查）见：[docs/使用教程.md](docs/使用教程.md)。
+
+最小使用流程如下：
+
+1. 把 `Listener-1.0.0.jar` 放入服务器的 `plugins` 目录并重启服务器。
+2. 编辑 `plugins/Listener/config.yml`，在 `listeners` 下添加或修改规则。
+3. 执行 `/listener reload` 重新加载配置。
+4. 用 `/listener list`、`/listener info <id>` 检查规则，或用 `/listener fire <id>` 由玩家手动测试动作。
+
 ## 命令
 
 ```text
