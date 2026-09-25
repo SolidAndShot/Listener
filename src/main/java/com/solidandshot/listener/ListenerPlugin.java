@@ -32,7 +32,7 @@ public final class ListenerPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (manager != null) {
-            manager.stopTimers();
+            manager.shutdown();
         }
     }
 

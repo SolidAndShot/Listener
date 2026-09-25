@@ -26,12 +26,18 @@ public final class ListenerManager {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("%([A-Za-z0-9_.:-]+)%");
 
     private final JavaPlugin plugin;
+    private final ClientBridge clientBridge;
     private final Map<String, String> variables = new ConcurrentHashMap<>();
     private volatile Map<String, ListenerDefinition> definitions = Map.of();
     private final List<ScheduledTask> timerTasks = new ArrayList<>();
 
     public ListenerManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.clientBridge = new ClientBridge(plugin, this::dispatch);
+    }
+
+    public ClientBridge clientBridge() {
+        return clientBridge;
     }
 
     public synchronized void reload() {
@@ -90,6 +96,11 @@ public final class ListenerManager {
             task.cancel();
         }
         timerTasks.clear();
+    }
+
+    public synchronized void shutdown() {
+        stopTimers();
+        clientBridge.close();
     }
 
     public void dispatch(EventContext context) {
@@ -163,6 +174,14 @@ public final class ListenerManager {
                 case "sound" -> playSound(player, value);
                 case "set_variable" -> setVariable(value);
                 case "log" -> plugin.getLogger().info(ChatColor.stripColor(colored));
+                case "client_action" -> {
+                    String[] parts = value.split("\\|", 2);
+                    String clientAction = parts[0].trim();
+                    String clientValue = parts.length > 1 ? parts[1] : "";
+                    clientBridge.sendAction(player, clientAction, clientValue);
+                }
+                case "client_message", "client_screen", "client_overlay", "client_sound" ->
+                        clientBridge.sendAction(player, action.type.substring("client_".length()), value);
                 default -> plugin.getLogger().warning("监听器 " + definition.id + " 使用了未知动作: " + action.type);
             }
         } catch (Exception ex) {

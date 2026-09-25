@@ -2,7 +2,7 @@
 
 一个面向 Minecraft 26.2、Luminol/Folia 26.2 build 727 的可配置服务器监听器插件。
 
-它借鉴 FancyMenu 的“监听器 Provider → 实例 → 动作脚本”模型，但使用 Bukkit/Folia 服务端事件实现，不修改客户端，也不要求复刻 FancyMenu 的 Mixin。适合把玩家加入、聊天、命令、死亡、伤害、移动、方块、物品、实体、世界和天气等事件转换成自动动作。
+它借鉴 FancyMenu 的“监听器 Provider → 实例 → 动作脚本”模型，核心使用 Bukkit/Folia 服务端事件实现；不安装客户端 Mod 也能独立运行。适合把玩家加入、聊天、命令、死亡、伤害、移动、方块、物品、实体、世界和天气等事件转换成自动动作。
 
 ## 环境
 
@@ -93,6 +93,8 @@ entity_spawn
 entity_death
 world_change
 weather_change
+client_connect
+client_*
 ```
 
 ## 动作
@@ -107,6 +109,11 @@ title
 sound
 set_variable
 log
+client_action
+client_message
+client_screen
+client_overlay
+client_sound
 ```
 
 每个动作支持 `delay_ticks`。动作会在 Folia 全局调度器或玩家调度器上执行，避免异步聊天事件直接操作世界对象。
@@ -127,4 +134,50 @@ log
 
 ## 设计边界
 
-FancyMenu 中依赖客户端 Mixin 的键盘、鼠标、屏幕、客户端音乐和客户端渲染监听器无法仅通过 Bukkit 服务端插件直接获得。本项目优先实现服务端能够稳定观察的事件，后续可以通过 ProtocolLib、PlaceholderAPI、ItemsAdder 或客户端配套模组扩展。
+FancyMenu 中依赖客户端 Mixin 的键盘、鼠标、屏幕、客户端音乐和客户端渲染监听器无法仅通过 Bukkit 服务端插件直接获得。本项目提供可选的客户端 Mod 桥接（Plugin Messaging）：客户端 Mod 可把这些事件上报为 `client_*` 事件，也可接收 `client_*` 动作。没有安装客户端 Mod 时，原有服务端功能不受影响。
+
+## 客户端 Mod 桥接协议
+
+服务端和客户端通过原生 Plugin Messaging 通道 `listener:main` 通信。每个消息都是 Java `DataOutputStream` 写出的二进制帧：
+
+```text
+byte protocol_version (当前为 1)
+byte opcode
+```
+
+客户端发送：
+
+- `opcode=1 HELLO`：`byte client_version`、`UTF mod_version`、`byte feature_count`、若干 `UTF feature`；
+- `opcode=4 EVENT`：`UTF event`、`byte field_count`、若干 `UTF key` + `UTF value`。
+
+事件名不带 `client_` 前缀时，服务端会自动补上；例如客户端发送 `keyboard_key_pressed`，规则中监听 `client_keyboard_key_pressed`。字段会作为普通监听器变量和过滤器使用，并自动包含 `source=client`。
+
+服务端发送：
+
+- `opcode=2 HELLO_ACK`：`boolean accepted`、`UTF reason`、`UTF capabilities`；
+- `opcode=3 ACTION`：`UTF action`、`UTF value`。
+
+客户端 Mod 可根据 `action` 实现打开屏幕、显示覆盖层、播放客户端音乐等行为；未知动作应安全忽略。所有字符串最多 4096 字符，单帧最多 32 KiB。协议不要求安装 ProtocolLib。
+
+### 客户端动作示例
+
+```yaml
+listeners:
+  open_profile:
+    event: client_keyboard_key_pressed
+    filters:
+      key_keycode: "80"
+    actions:
+      - type: client_screen
+        value: "inventory"
+
+  show_overlay:
+    event: player_join
+    actions:
+      - type: client_overlay
+        value: "欢迎，%player_name%！"
+```
+
+可用动作包括 `client_action`（值格式为 `动作名|参数`）以及便捷别名 `client_message`、`client_screen`、`client_overlay`、`client_sound`。这些动作只有在玩家安装并启用兼容客户端 Mod 时才会显示效果。
+
+安全提示：客户端事件由玩家客户端自行上报，不能作为管理员签名或反作弊凭据。不要仅凭 `client_*` 事件执行踢人、封禁、权限变更等高权限控制台命令。

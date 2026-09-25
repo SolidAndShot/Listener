@@ -50,6 +50,7 @@ public final class BukkitEventListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         manager.dispatch(context("player_quit", player, Map.of("quit_message", safe(event.getQuitMessage()))));
+        manager.clientBridge().remove(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
