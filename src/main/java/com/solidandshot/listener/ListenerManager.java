@@ -33,7 +33,7 @@ public final class ListenerManager {
 
     public ListenerManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.clientBridge = new ClientBridge(plugin, this::dispatch);
+        this.clientBridge = new ClientBridge(plugin, this::dispatch, this);
     }
 
     public ClientBridge clientBridge() {
@@ -192,6 +192,15 @@ public final class ListenerManager {
         plugin.saveConfig();
         reload();
         return true;
+    }
+
+    /** Removes a rule from config.yml for the authorized visual editor. */
+    public synchronized boolean removeRule(String id) {
+        if (id == null || !definitions.containsKey(id)) return false;
+        plugin.getConfig().set("listeners." + id, null);
+        plugin.saveConfig();
+        reload();
+        return !definitions.containsKey(id);
     }
 
     private void scheduleAction(ListenerDefinition definition, ActionSpec action, EventContext context) {

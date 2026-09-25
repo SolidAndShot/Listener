@@ -37,6 +37,13 @@ public final class ClientBridge implements PluginMessageListener {
     private static final int OP_HELLO_ACK = 2;
     private static final int OP_ACTION = 3;
     private static final int OP_EVENT = 4;
+    /** Client editor request/response operations. Kept in protocol v1 for backwards compatibility. */
+    private static final int OP_EDITOR_REQUEST = 5;
+    private static final int OP_EDITOR_RESPONSE = 6;
+    private static final int EDITOR_GET_RULES = 1;
+    private static final int EDITOR_SAVE_RULE = 2;
+    private static final int EDITOR_DELETE_RULE = 3;
+    private static final int EDITOR_TEST_RULE = 4;
     private static final int MAX_MESSAGE_BYTES = 32 * 1024;
     private static final int MAX_STRING_CHARS = 4096;
     private static final int MAX_FIELDS = 64;
@@ -44,11 +51,13 @@ public final class ClientBridge implements PluginMessageListener {
 
     private final Plugin plugin;
     private final Consumer<EventContext> eventSink;
+    private final ListenerManager manager;
     private final Map<UUID, ClientInfo> clients = new ConcurrentHashMap<>();
 
-    public ClientBridge(Plugin plugin, Consumer<EventContext> eventSink) {
+    public ClientBridge(Plugin plugin, Consumer<EventContext> eventSink, ListenerManager manager) {
         this.plugin = plugin;
         this.eventSink = eventSink;
+        this.manager = manager;
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL, this);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
     }
@@ -102,6 +111,7 @@ public final class ClientBridge implements PluginMessageListener {
             switch (op) {
                 case OP_HELLO -> receiveHello(player, in);
                 case OP_EVENT -> receiveEvent(player, in);
+                case OP_EDITOR_REQUEST -> receiveEditorRequest(player, in);
                 default -> plugin.getLogger().fine("忽略未知客户端消息操作码: " + op);
             }
         } catch (EOFException ex) {
@@ -151,11 +161,143 @@ public final class ClientBridge implements PluginMessageListener {
         eventSink.accept(new EventContext(event, player, values));
     }
 
+    private void receiveEditorRequest(Player player, DataInputStream in) throws IOException {
+        int request = in.readUnsignedByte();
+        if (!player.hasPermission("listener.admin")) {
+            sendEditorError(player, request, "forbidden");
+            return;
+        }
+        switch (request) {
+            case EDITOR_GET_RULES -> sendRules(player);
+            case EDITOR_SAVE_RULE -> saveFromClient(player, in);
+            case EDITOR_DELETE_RULE -> deleteFromClient(player, in);
+            case EDITOR_TEST_RULE -> testFromClient(player, in);
+            default -> sendEditorError(player, request, "unknown_request");
+        }
+    }
+
+    private void sendRules(Player player) throws IOException {
+        byte[] payload = frame(OP_EDITOR_RESPONSE, out -> {
+            out.writeBoolean(true);
+            out.writeUTF("ok");
+            writeRules(out);
+        });
+        player.sendPluginMessage(plugin, CHANNEL, payload);
+    }
+
+    private void saveFromClient(Player player, DataInputStream in) throws IOException {
+        ListenerManager.ListenerDefinition rule = readRule(in);
+        if (rule == null) {
+            sendEditorError(player, EDITOR_SAVE_RULE, "invalid_rule");
+            return;
+        }
+        boolean saved = manager.saveRule(rule.id(), rule.event(), rule.enabled(), rule.filters(),
+                rule.actions(), rule.intervalTicks());
+        plugin.getLogger().info("客户端编辑器保存规则 " + rule.id() + "（" + player.getName() + "）：" + saved);
+        sendEditorResult(player, EDITOR_SAVE_RULE, saved, saved ? "saved" : "save_failed");
+    }
+
+    private void deleteFromClient(Player player, DataInputStream in) throws IOException {
+        String id = readString(in).trim();
+        boolean deleted = validRuleId(id) && manager.removeRule(id);
+        plugin.getLogger().info("客户端编辑器删除规则 " + id + "（" + player.getName() + "）：" + deleted);
+        sendEditorResult(player, EDITOR_DELETE_RULE, deleted, deleted ? "deleted" : "delete_failed");
+    }
+
+    private void testFromClient(Player player, DataInputStream in) throws IOException {
+        String id = readString(in).trim();
+        boolean exists = validRuleId(id) && manager.definitions().containsKey(id);
+        if (exists) manager.fire(id, player);
+        sendEditorResult(player, EDITOR_TEST_RULE, exists, exists ? "tested" : "not_found");
+    }
+
+    private void sendEditorError(Player player, int request, String reason) throws IOException {
+        sendEditorResult(player, request, false, reason);
+    }
+
+    private void sendEditorResult(Player player, int request, boolean success, String reason) throws IOException {
+        byte[] payload = frame(OP_EDITOR_RESPONSE, out -> {
+            out.writeBoolean(success);
+            out.writeUTF(limit(reason));
+            // Return the authoritative post-operation snapshot as well. This
+            // keeps the client list in sync after save/delete/test without a
+            // second request and makes an empty successful list unambiguous.
+            if (success) writeRules(out);
+            else out.writeByte(0);
+        });
+        player.sendPluginMessage(plugin, CHANNEL, payload);
+    }
+
+    private void writeRules(DataOutputStream out) throws IOException {
+        int count = Math.min(manager.definitions().size(), MAX_FIELDS);
+        out.writeByte(count);
+        int index = 0;
+        for (ListenerManager.ListenerDefinition definition : manager.definitions().values()) {
+            if (index++ >= count) break;
+            writeRule(out, definition);
+        }
+    }
+
+    private static void writeRule(DataOutputStream out, ListenerManager.ListenerDefinition definition) throws IOException {
+        out.writeUTF(limit(definition.id()));
+        out.writeUTF(limit(definition.event()));
+        out.writeBoolean(definition.enabled());
+        out.writeLong(Math.max(1L, Math.min(2_000_000L, definition.intervalTicks())));
+        int filterCount = Math.min(definition.filters().size(), MAX_FIELDS);
+        out.writeByte(filterCount);
+        int index = 0;
+        for (Map.Entry<String, String> entry : definition.filters().entrySet()) {
+            if (index++ >= filterCount) break;
+            out.writeUTF(limit(entry.getKey()));
+            out.writeUTF(limit(entry.getValue()));
+        }
+        int actionCount = Math.min(definition.actions().size(), MAX_FIELDS);
+        out.writeByte(actionCount);
+        index = 0;
+        for (ListenerManager.ActionSpec action : definition.actions()) {
+            if (index++ >= actionCount) break;
+            out.writeUTF(limit(action.type()));
+            out.writeUTF(limit(action.value()));
+            out.writeLong(Math.max(0L, Math.min(2_000_000L, action.delayTicks())));
+        }
+    }
+
+    private static ListenerManager.ListenerDefinition readRule(DataInputStream in) throws IOException {
+        String id = readString(in).trim();
+        String event = readString(in).trim().toLowerCase();
+        boolean enabled = in.readBoolean();
+        long interval = in.readLong();
+        int filterCount = in.readUnsignedByte();
+        if (!validRuleId(id) || !validName(event) || filterCount > MAX_FIELDS || interval < 1 || interval > 2_000_000) return null;
+        Map<String, String> filters = new LinkedHashMap<>();
+        for (int i = 0; i < filterCount; i++) {
+            String key = readString(in).toLowerCase();
+            String value = readString(in);
+            if (!validName(key)) return null;
+            filters.put(key, value);
+        }
+        int actionCount = in.readUnsignedByte();
+        if (actionCount > MAX_FIELDS || actionCount == 0) return null;
+        List<ListenerManager.ActionSpec> actions = new ArrayList<>();
+        for (int i = 0; i < actionCount; i++) {
+            String type = readString(in).toLowerCase();
+            String value = readString(in);
+            long delay = in.readLong();
+            if (!validName(type) || delay < 0 || delay > 2_000_000) return null;
+            actions.add(new ListenerManager.ActionSpec(type, value, delay));
+        }
+        return new ListenerManager.ListenerDefinition(id, event, enabled, filters, actions, interval);
+    }
+
+    private static boolean validRuleId(String id) {
+        return id != null && id.matches("[A-Za-z0-9_-]{1,64}");
+    }
+
     private void sendHelloAck(Player player, boolean accepted, String reason) throws IOException {
         byte[] payload = frame(OP_HELLO_ACK, out -> {
             out.writeBoolean(accepted);
             out.writeUTF(reason);
-            out.writeUTF("action,event");
+            out.writeUTF("action,event" + (player.hasPermission("listener.admin") ? ",editor" : ""));
         });
         player.sendPluginMessage(plugin, CHANNEL, payload);
     }

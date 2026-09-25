@@ -162,6 +162,19 @@ byte opcode
 
 客户端 Mod 可根据 `action` 实现打开屏幕、显示覆盖层、播放客户端音乐等行为；未知动作应安全忽略。所有字符串最多 4096 字符，单帧最多 32 KiB。协议不要求安装 ProtocolLib。
 
+### 客户端现代化编辑器
+
+安装 [ListenerClient](https://github.com/SolidAndShot/ListenerClient) 后，在游戏内按 `K` 打开现代化三栏编辑器。左栏按分类、搜索和滚轮分页选择 FancyMenu 26.2 的 85 个 Listener provider；中栏填写规则 ID 与过滤字段；右栏选择动作、启停状态，并可载入、测试或删除服务器规则。
+
+编辑器保存的远程规则仍由服务端写入 `plugins/Listener/config.yml`，不会把权限交给客户端。只有拥有 `listener.admin` 的玩家会在握手能力中获得 `editor`，服务端也会对每一次读取、保存、测试和删除请求重新校验权限。未安装服务端插件或没有权限时，编辑器仍可保存本地草稿，但不会伪造远程成功。
+
+FancyMenu 的纯客户端资源事件（动画材质、视频、文件/ZIP、FM 变量、远程资源等）会在目录中显示“需扩展”；它们可以被完整选择和保存，只有安装对应客户端资源桥接后才会产生实际事件。
+
+编辑器扩展协议使用同一 `listener:main` 通道：
+
+- `opcode=5 EDIT_REQUEST`：`mode=1` 获取规则，`mode=2` 保存规则，`mode=3` 删除规则，`mode=4` 测试规则；
+- `opcode=6 EDIT_RESPONSE`：`boolean accepted`、`UTF reason`、规则数量及规则快照（动作包含 `delay_ticks`）。
+
 ### 客户端动作示例
 
 ```yaml
