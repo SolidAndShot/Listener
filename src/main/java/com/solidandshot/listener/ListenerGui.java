@@ -64,6 +64,7 @@ public final class ListenerGui implements Listener {
         GuiHolder holder = new GuiHolder(GuiPage.MODE, 0, null);
         Inventory inventory = Bukkit.createInventory(holder, 54, MAIN_TITLE + ChatColor.GRAY + " · 选择模式");
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.CYAN_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(4, item(Material.BEACON, "§3Listener Studio",
                 "§7选择适合你的编辑方式", "§8新手可从向导开始"));
@@ -84,6 +85,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + "  " + (page + 1) + "/" + pageCount);
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.BLACK_STAINED_GLASS_PANE);
         fillBackground(inventory);
         for (int index = 0; index < PAGE_SIZE; index++) {
             int absolute = page * PAGE_SIZE + index;
@@ -112,6 +114,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + " · 新手向导 2/5");
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.BLUE_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(4, item(Material.COMPASS, "§b步骤 2/5 · 选择触发事件",
                 "§7选择玩家加入、聊天、方块等事件", "§7也可以选择客户端 Mod 事件"));
@@ -137,6 +140,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + " · 新手向导 3/5");
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.PURPLE_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(4, item(Material.COMMAND_BLOCK, "§d步骤 3/5 · 选择动作",
                 "§7选择消息、命令、音效或客户端动作"));
@@ -161,6 +165,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + " · 新手向导 4/5");
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.LIGHT_BLUE_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(4, item(Material.WRITABLE_BOOK, "§e步骤 4/5 · 设置内容",
                 "§7使用推荐模板，或输入自定义内容"));
@@ -186,6 +191,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + " · 新手向导 5/5");
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.GRAY_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(4, item(Material.EMERALD, "§a步骤 5/5 · 预览并保存",
                 "§7确认无误后保存并启用规则"));
@@ -214,6 +220,7 @@ public final class ListenerGui implements Listener {
         GuiHolder holder = new GuiHolder(GuiPage.DETAIL, 0, id);
         Inventory inventory = Bukkit.createInventory(holder, 54, DETAIL_PREFIX + id);
         holder.inventory = inventory;
+        fillEmpty(inventory, Material.BLACK_STAINED_GLASS_PANE);
         fillBackground(inventory);
         inventory.setItem(10, item(Material.NAME_TAG, "§b事件: §f" + definition.event(),
                 "§7点击后在聊天框输入新的事件名", "§8例如 player_join、timer、client_connect"));
@@ -229,6 +236,7 @@ public final class ListenerGui implements Listener {
                 "§7当前: " + definition.intervalTicks() + " ticks", "§e点击输入新的 tick 数"));
         inventory.setItem(49, item(Material.ARROW, "§e返回规则列表", "§7返回上一页"));
         inventory.setItem(52, item(Material.BARRIER, "§c关闭", "§7关闭管理页面"));
+        fillEmpty(inventory, Material.BLACK_STAINED_GLASS_PANE);
         player.openInventory(inventory);
     }
 
@@ -811,6 +819,12 @@ public final class ListenerGui implements Listener {
             stack.setItemMeta(meta);
         }
         return stack;
+    }
+
+    private static void fillEmpty(Inventory inventory, Material material) {
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            if (inventory.getItem(slot) == null) inventory.setItem(slot, item(material, " "));
+        }
     }
 
     private enum GuiPage { MAIN, DETAIL, MODE, WIZARD_EVENT, WIZARD_ACTION, WIZARD_CONTENT, WIZARD_PREVIEW }
