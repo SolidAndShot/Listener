@@ -56,10 +56,26 @@ public final class ListenerGui implements Listener {
 
     public void openMain(Player player) {
         if (!authorised(player)) return;
-        openMain(player, 0);
+        openModeSelect(player);
     }
 
-    private void openMain(Player player, int requestedPage) {
+    private void openModeSelect(Player player) {
+        if (!authorised(player)) return;
+        GuiHolder holder = new GuiHolder(GuiPage.MODE, 0, null);
+        Inventory inventory = Bukkit.createInventory(holder, 54, MAIN_TITLE + ChatColor.GRAY + " · 选择模式");
+        holder.inventory = inventory;
+        fillBackground(inventory);
+        inventory.setItem(4, item(Material.BEACON, "§3Listener Studio",
+                "§7选择适合你的编辑方式", "§8新手可从向导开始"));
+        inventory.setItem(20, item(Material.NETHER_STAR, "§a新手向导",
+                "§7用 5 个简单步骤创建规则", "§7事件和动作通过菜单选择", "§e只在输入 ID/自定义内容时使用聊天"));
+        inventory.setItem(24, item(Material.ENCHANTED_BOOK, "§b高级编辑",
+                "§7查看和修改已有监听器", "§7支持启停、测试和精细调整"));
+        inventory.setItem(49, item(Material.BARRIER, "§c关闭", "§7关闭管理页面"));
+        player.openInventory(inventory);
+    }
+
+    private void openAdvancedMain(Player player, int requestedPage) {
         if (!authorised(player)) return;
         List<ListenerManager.ListenerDefinition> definitions = new ArrayList<>(manager.definitions().values());
         int pageCount = Math.max(1, (definitions.size() + PAGE_SIZE - 1) / PAGE_SIZE);
@@ -68,6 +84,7 @@ public final class ListenerGui implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, 54,
                 MAIN_TITLE + ChatColor.GRAY + "  " + (page + 1) + "/" + pageCount);
         holder.inventory = inventory;
+        fillBackground(inventory);
         for (int index = 0; index < PAGE_SIZE; index++) {
             int absolute = page * PAGE_SIZE + index;
             if (absolute >= definitions.size()) break;
@@ -76,9 +93,113 @@ public final class ListenerGui implements Listener {
         }
         inventory.setItem(45, item(Material.ARROW, "§e上一页", "§7查看上一页规则"));
         inventory.setItem(46, item(Material.CLOCK, "§b重新加载", "§7从 config.yml 重新读取规则"));
-        inventory.setItem(49, item(Material.WRITABLE_BOOK, "§a新建监听器", "§7按提示输入规则名称、事件和动作"));
+        inventory.setItem(47, item(Material.NETHER_STAR, "§a新手向导", "§7按菜单步骤创建规则"));
+        inventory.setItem(48, item(Material.COMPASS, "§b选择模式", "§7返回新手向导/高级编辑选择"));
+        inventory.setItem(49, item(Material.WRITABLE_BOOK, "§e快速新建", "§7使用聊天快速输入全部内容"));
         inventory.setItem(53, item(Material.ARROW, "§e下一页", "§7查看下一页规则"));
         inventory.setItem(52, item(Material.BARRIER, "§c关闭", "§7关闭管理页面"));
+        player.openInventory(inventory);
+    }
+
+    private void openAdvancedMain(Player player) {
+        openAdvancedMain(player, 0);
+    }
+
+    /** Opens the menu-driven beginner flow after the rule id has been entered. */
+    private void openWizardEvents(Player player) {
+        if (!authorised(player)) return;
+        GuiHolder holder = new GuiHolder(GuiPage.WIZARD_EVENT, 0, null);
+        Inventory inventory = Bukkit.createInventory(holder, 54,
+                MAIN_TITLE + ChatColor.GRAY + " · 新手向导 2/5");
+        holder.inventory = inventory;
+        fillBackground(inventory);
+        inventory.setItem(4, item(Material.COMPASS, "§b步骤 2/5 · 选择触发事件",
+                "§7选择玩家加入、聊天、方块等事件", "§7也可以选择客户端 Mod 事件"));
+        List<String> events = wizardEvents();
+        List<Integer> slots = wizardEventSlots();
+        for (int i = 0; i < events.size(); i++) {
+            String event = events.get(i);
+            inventory.setItem(slots.get(i), item(eventMaterial(event), "§b" + event,
+                    "§7" + eventLabel(event), "§e点击选择"));
+        }
+        inventory.setItem(49, item(Material.ARROW, "§e上一步", "§7重新输入规则 ID"));
+        inventory.setItem(52, item(Material.BARRIER, "§c取消", "§7返回模式选择"));
+        player.openInventory(inventory);
+    }
+
+    private void openWizardActions(Player player) {
+        EditSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.mode != EditMode.WIZARD) {
+            openModeSelect(player);
+            return;
+        }
+        GuiHolder holder = new GuiHolder(GuiPage.WIZARD_ACTION, 0, null);
+        Inventory inventory = Bukkit.createInventory(holder, 54,
+                MAIN_TITLE + ChatColor.GRAY + " · 新手向导 3/5");
+        holder.inventory = inventory;
+        fillBackground(inventory);
+        inventory.setItem(4, item(Material.COMMAND_BLOCK, "§d步骤 3/5 · 选择动作",
+                "§7选择消息、命令、音效或客户端动作"));
+        List<Integer> slots = wizardActionSlots();
+        for (int i = 0; i < ACTIONS.size(); i++) {
+            String action = ACTIONS.get(i);
+            inventory.setItem(slots.get(i), item(actionMaterial(action), "§d" + action,
+                    "§7" + actionLabel(action), "§e点击选择"));
+        }
+        inventory.setItem(49, item(Material.ARROW, "§e上一步", "§7返回事件选择"));
+        inventory.setItem(52, item(Material.BARRIER, "§c取消", "§7返回模式选择"));
+        player.openInventory(inventory);
+    }
+
+    private void openWizardContent(Player player) {
+        EditSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.mode != EditMode.WIZARD) {
+            openModeSelect(player);
+            return;
+        }
+        GuiHolder holder = new GuiHolder(GuiPage.WIZARD_CONTENT, 0, null);
+        Inventory inventory = Bukkit.createInventory(holder, 54,
+                MAIN_TITLE + ChatColor.GRAY + " · 新手向导 4/5");
+        holder.inventory = inventory;
+        fillBackground(inventory);
+        inventory.setItem(4, item(Material.WRITABLE_BOOK, "§e步骤 4/5 · 设置内容",
+                "§7使用推荐模板，或输入自定义内容"));
+        String preset = defaultContent(session.actionType);
+        inventory.setItem(20, item(Material.PAPER, "§a使用推荐模板",
+                "§7" + trimForLore(preset), "§e点击直接使用"));
+        inventory.setItem(24, item(Material.WRITABLE_BOOK, "§b自定义内容",
+                "§7输入你自己的消息/命令/音效", "§e需要在聊天框输入"));
+        inventory.setItem(31, item(Material.BOOK, "§f当前动作: §d" + session.actionType,
+                "§7" + actionLabel(session.actionType)));
+        inventory.setItem(49, item(Material.ARROW, "§e上一步", "§7返回动作选择"));
+        inventory.setItem(52, item(Material.BARRIER, "§c取消", "§7返回模式选择"));
+        player.openInventory(inventory);
+    }
+
+    private void openWizardPreview(Player player) {
+        EditSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.mode != EditMode.WIZARD) {
+            openModeSelect(player);
+            return;
+        }
+        GuiHolder holder = new GuiHolder(GuiPage.WIZARD_PREVIEW, 0, null);
+        Inventory inventory = Bukkit.createInventory(holder, 54,
+                MAIN_TITLE + ChatColor.GRAY + " · 新手向导 5/5");
+        holder.inventory = inventory;
+        fillBackground(inventory);
+        inventory.setItem(4, item(Material.EMERALD, "§a步骤 5/5 · 预览并保存",
+                "§7确认无误后保存并启用规则"));
+        inventory.setItem(10, item(Material.NAME_TAG, "§f规则 ID: §b" + session.id));
+        inventory.setItem(12, item(Material.COMPASS, "§f事件: §b" + session.event,
+                "§7" + eventLabel(session.event)));
+        inventory.setItem(14, item(Material.COMMAND_BLOCK, "§f动作: §d" + session.actionType,
+                "§7" + actionLabel(session.actionType)));
+        inventory.setItem(16, item(Material.PAPER, "§f内容预览",
+                "§7" + trimForLore(session.actionValue)));
+        inventory.setItem(31, item(Material.EMERALD_BLOCK, "§a保存并启用",
+                "§7写入 config.yml 并立即重载"));
+        inventory.setItem(45, item(Material.ARROW, "§e返回修改", "§7回到内容选择"));
+        inventory.setItem(52, item(Material.BARRIER, "§c取消", "§7不保存并返回模式选择"));
         player.openInventory(inventory);
     }
 
@@ -87,12 +208,13 @@ public final class ListenerGui implements Listener {
         ListenerManager.ListenerDefinition definition = manager.definitions().get(id);
         if (definition == null) {
             player.sendMessage(ChatColor.RED + "找不到监听器: " + id);
-            openMain(player);
+            openAdvancedMain(player);
             return;
         }
         GuiHolder holder = new GuiHolder(GuiPage.DETAIL, 0, id);
         Inventory inventory = Bukkit.createInventory(holder, 54, DETAIL_PREFIX + id);
         holder.inventory = inventory;
+        fillBackground(inventory);
         inventory.setItem(10, item(Material.NAME_TAG, "§b事件: §f" + definition.event(),
                 "§7点击后在聊天框输入新的事件名", "§8例如 player_join、timer、client_connect"));
         inventory.setItem(12, item(definition.enabled() ? Material.LIME_DYE : Material.GRAY_DYE,
@@ -121,7 +243,9 @@ public final class ListenerGui implements Listener {
         }
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
         if (holder.page == GuiPage.MAIN) handleMainClick(player, holder, event.getRawSlot(), event.isRightClick());
-        else handleDetailClick(player, holder, event.getRawSlot());
+        else if (holder.page == GuiPage.DETAIL) handleDetailClick(player, holder, event.getRawSlot());
+        else if (holder.page == GuiPage.MODE) handleModeClick(player, event.getRawSlot());
+        else handleWizardClick(player, holder.page, event.getRawSlot());
     }
 
     @EventHandler
@@ -139,6 +263,104 @@ public final class ListenerGui implements Listener {
         sessions.remove(event.getPlayer().getUniqueId());
     }
 
+    private void handleModeClick(Player player, int slot) {
+        switch (slot) {
+            case 20 -> startWizard(player);
+            case 24 -> openAdvancedMain(player);
+            case 49 -> player.closeInventory();
+            default -> { }
+        }
+    }
+
+    private void handleWizardClick(Player player, GuiPage page, int slot) {
+        EditSession session = sessions.get(player.getUniqueId());
+        if (session == null || session.mode != EditMode.WIZARD) {
+            openModeSelect(player);
+            return;
+        }
+        if (page == GuiPage.WIZARD_EVENT) {
+            if (slot == 49) {
+                player.closeInventory();
+                session.wizardStage = WizardStage.ID;
+                prompt(player, "重新输入规则 ID（输入 cancel 取消）");
+            } else if (slot == 52) {
+                cancelWizard(player);
+            } else {
+                String selected = wizardEventForSlot(slot);
+                if (selected == null) return;
+                if (selected.equals("client_custom")) {
+                    player.closeInventory();
+                    session.wizardStage = WizardStage.EVENT_CUSTOM;
+                    prompt(player, "输入 client_ 开头的客户端事件名，例如 client_key_pressed");
+                } else {
+                    session.event = selected;
+                    session.wizardStage = WizardStage.ACTION;
+                    openWizardActions(player);
+                }
+            }
+        } else if (page == GuiPage.WIZARD_ACTION) {
+            if (slot == 49) {
+                session.wizardStage = WizardStage.EVENT;
+                openWizardEvents(player);
+            } else if (slot == 52) {
+                cancelWizard(player);
+            } else {
+                String selected = wizardActionForSlot(slot);
+                if (selected == null) return;
+                session.actionType = selected;
+                session.wizardStage = WizardStage.CONTENT;
+                openWizardContent(player);
+            }
+        } else if (page == GuiPage.WIZARD_CONTENT) {
+            if (slot == 49) {
+                session.wizardStage = WizardStage.ACTION;
+                openWizardActions(player);
+            } else if (slot == 52) {
+                cancelWizard(player);
+            } else if (slot == 20) {
+                session.actionValue = defaultContent(session.actionType);
+                session.wizardStage = WizardStage.PREVIEW;
+                openWizardPreview(player);
+            } else if (slot == 24) {
+                player.closeInventory();
+                session.wizardStage = WizardStage.CONTENT_CUSTOM;
+                prompt(player, "输入动作内容（颜色可用 &a，占位符可用 %player_name%；输入 cancel 取消）");
+            }
+        } else if (page == GuiPage.WIZARD_PREVIEW) {
+            if (slot == 45) {
+                session.wizardStage = WizardStage.CONTENT;
+                openWizardContent(player);
+            } else if (slot == 52) {
+                cancelWizard(player);
+            } else if (slot == 31) {
+                saveWizard(player, session);
+            }
+        }
+    }
+
+    private void saveWizard(Player player, EditSession session) {
+        if (session.id == null || session.event == null || session.actionType == null || session.actionValue == null) {
+            player.sendMessage(ChatColor.RED + "向导信息不完整，请返回修改。");
+            return;
+        }
+        List<ListenerManager.ActionSpec> actions = List.of(
+                new ListenerManager.ActionSpec(session.actionType, session.actionValue, 0));
+        if (manager.saveRule(session.id, session.event, true, Map.of(), actions, 20)) {
+            sessions.remove(player.getUniqueId(), session);
+            player.sendMessage(ChatColor.GREEN + "已创建并启用监听器: " + session.id);
+            openAdvancedMain(player);
+        } else {
+            player.sendMessage(ChatColor.RED + "保存失败，请返回检查内容长度或格式。");
+        }
+    }
+
+    private void cancelWizard(Player player) {
+        sessions.remove(player.getUniqueId());
+        player.closeInventory();
+        player.sendMessage(ChatColor.YELLOW + "已取消新手向导。");
+        openModeSelect(player);
+    }
+
     private void handleMainClick(Player player, GuiHolder holder, int slot, boolean rightClick) {
         if (slot < PAGE_SIZE) {
             int absolute = holder.index * PAGE_SIZE + slot;
@@ -149,7 +371,7 @@ public final class ListenerGui implements Listener {
                 ListenerManager.ListenerDefinition definition = manager.definitions().get(id);
                 if (definition != null && manager.setEnabled(id, !definition.enabled())) {
                     player.sendMessage(ChatColor.GREEN + id + (definition.enabled() ? " 已停用" : " 已启用"));
-                    openMain(player, holder.index);
+                    openAdvancedMain(player, holder.index);
                 }
             } else {
                 openDetail(player, id);
@@ -157,16 +379,18 @@ public final class ListenerGui implements Listener {
             return;
         }
         switch (slot) {
-            case 45 -> openMain(player, holder.index - 1);
+            case 45 -> openAdvancedMain(player, holder.index - 1);
             case 46 -> {
                 plugin.reloadConfig();
                 manager.reload();
                 player.sendMessage(ChatColor.GREEN + "监听器配置已重新加载。");
-                openMain(player, holder.index);
+                openAdvancedMain(player, holder.index);
             }
+            case 47 -> startWizard(player);
+            case 48 -> openModeSelect(player);
             case 49 -> startCreate(player);
             case 52 -> player.closeInventory();
-            case 53 -> openMain(player, holder.index + 1);
+            case 53 -> openAdvancedMain(player, holder.index + 1);
             default -> { }
         }
     }
@@ -175,7 +399,7 @@ public final class ListenerGui implements Listener {
         String id = holder.id;
         ListenerManager.ListenerDefinition definition = manager.definitions().get(id);
         if (definition == null) {
-            openMain(player);
+            openAdvancedMain(player);
             return;
         }
         switch (slot) {
@@ -190,7 +414,7 @@ public final class ListenerGui implements Listener {
                 player.sendMessage(ChatColor.GREEN + "已测试监听器: " + id);
             }
             case 31 -> startEditInterval(player, definition);
-            case 49 -> openMain(player);
+            case 49 -> openAdvancedMain(player);
             case 52 -> player.closeInventory();
             default -> { }
         }
@@ -206,6 +430,14 @@ public final class ListenerGui implements Listener {
         player.closeInventory();
         sessions.put(player.getUniqueId(), EditSession.create());
         prompt(player, "第一步/共四步：输入新监听器 ID（仅英文、数字、_、-；输入 cancel 取消）");
+    }
+
+    private void startWizard(Player player) {
+        if (!authorised(player)) return;
+        player.closeInventory();
+        EditSession session = EditSession.wizard();
+        sessions.put(player.getUniqueId(), session);
+        prompt(player, "新手向导 1/5：输入规则 ID（仅英文、数字、_、-；输入 cancel 取消）");
     }
 
     private void startEditEvent(Player player, ListenerManager.ListenerDefinition definition) {
@@ -264,7 +496,9 @@ public final class ListenerGui implements Listener {
             openMain(player);
             return;
         }
-        if (session.mode == EditMode.CREATE) {
+        if (session.mode == EditMode.WIZARD) {
+            handleWizardInput(player, session, input);
+        } else if (session.mode == EditMode.CREATE) {
             handleCreateInput(player, session, input);
         } else if (session.mode == EditMode.EDIT_EVENT) {
             finishEventEdit(player, session, input);
@@ -272,6 +506,38 @@ public final class ListenerGui implements Listener {
             handleActionEdit(player, session, input);
         } else {
             finishIntervalEdit(player, session, input);
+        }
+    }
+
+    private void handleWizardInput(Player player, EditSession session, String input) {
+        if (session.wizardStage == WizardStage.ID) {
+            if (!input.matches("[A-Za-z0-9_-]+") || input.length() > 64) {
+                prompt(player, "ID 格式不正确，请使用英文、数字、_、-（最长 64 个字符）");
+                return;
+            }
+            if (manager.definitions().containsKey(input)) {
+                prompt(player, "这个 ID 已存在，请换一个名称");
+                return;
+            }
+            session.id = input;
+            session.wizardStage = WizardStage.EVENT;
+            openWizardEvents(player);
+        } else if (session.wizardStage == WizardStage.EVENT_CUSTOM) {
+            if (!validEvent(input) || !input.toLowerCase(Locale.ROOT).startsWith("client_")) {
+                prompt(player, "请输入 client_ 开头的客户端事件名，例如 client_key_pressed");
+                return;
+            }
+            session.event = input.toLowerCase(Locale.ROOT);
+            session.wizardStage = WizardStage.ACTION;
+            openWizardActions(player);
+        } else if (session.wizardStage == WizardStage.CONTENT_CUSTOM) {
+            if (input.length() > 4096) {
+                prompt(player, "内容最长 4096 个字符，请重新输入");
+                return;
+            }
+            session.actionValue = input;
+            session.wizardStage = WizardStage.PREVIEW;
+            openWizardPreview(player);
         }
     }
 
@@ -393,6 +659,141 @@ public final class ListenerGui implements Listener {
         return EVENTS.contains(event) || (event.startsWith("client_") && event.matches("client_[a-z0-9_.:-]+"));
     }
 
+    private static List<String> wizardEvents() {
+        List<String> values = new ArrayList<>(EVENTS);
+        values.add("client_connect");
+        values.add("client_custom");
+        return values;
+    }
+
+    private static List<Integer> wizardEventSlots() {
+        List<Integer> slots = new ArrayList<>();
+        for (int row : List.of(1, 2, 3)) {
+            for (int column = 1; column <= 7; column++) slots.add(row * 9 + column);
+        }
+        return slots;
+    }
+
+    private static List<Integer> wizardActionSlots() {
+        List<Integer> slots = new ArrayList<>();
+        for (int row : List.of(1, 2)) {
+            for (int column = 1; column <= 7; column++) slots.add(row * 9 + column);
+        }
+        return slots;
+    }
+
+    private static String wizardEventForSlot(int slot) {
+        List<Integer> slots = wizardEventSlots();
+        List<String> events = wizardEvents();
+        int index = slots.indexOf(slot);
+        return index >= 0 && index < events.size() ? events.get(index) : null;
+    }
+
+    private static String wizardActionForSlot(int slot) {
+        List<Integer> slots = wizardActionSlots();
+        int index = slots.indexOf(slot);
+        return index >= 0 && index < ACTIONS.size() ? ACTIONS.get(index) : null;
+    }
+
+    private static Material eventMaterial(String event) {
+        if (event.startsWith("client_")) return Material.ENDER_EYE;
+        if (event.contains("block") || event.contains("item")) return Material.IRON_PICKAXE;
+        if (event.contains("world") || event.contains("weather")) return Material.GRASS_BLOCK;
+        if (event.contains("entity")) return Material.ZOMBIE_HEAD;
+        if (event.equals("timer")) return Material.CLOCK;
+        return Material.PLAYER_HEAD;
+    }
+
+    private static Material actionMaterial(String action) {
+        if (action.startsWith("client_")) return Material.ENDER_PEARL;
+        if (action.contains("command")) return Material.COMMAND_BLOCK;
+        if (action.equals("sound")) return Material.NOTE_BLOCK;
+        if (action.equals("log")) return Material.BOOK;
+        return Material.PAPER;
+    }
+
+    private static String eventLabel(String event) {
+        return switch (event) {
+            case "player_join" -> "玩家加入服务器";
+            case "player_quit" -> "玩家离开服务器";
+            case "player_chat" -> "玩家发送聊天消息";
+            case "player_command" -> "玩家执行命令";
+            case "player_death" -> "玩家死亡";
+            case "player_damage" -> "玩家受到伤害";
+            case "player_move" -> "玩家跨方块移动";
+            case "block_break" -> "玩家破坏方块";
+            case "block_place" -> "玩家放置方块";
+            case "player_interact" -> "玩家交互方块或物品";
+            case "item_consume" -> "玩家食用物品";
+            case "item_pickup" -> "玩家捡起物品";
+            case "entity_spawn" -> "实体生成";
+            case "entity_death" -> "实体死亡";
+            case "world_change" -> "玩家切换世界";
+            case "weather_change" -> "天气变化";
+            case "server_start" -> "服务器启动";
+            case "timer" -> "按时间间隔触发";
+            case "client_connect" -> "客户端 Mod 连接";
+            case "client_custom" -> "自定义客户端事件";
+            default -> "客户端 Mod 事件";
+        };
+    }
+
+    private static String actionLabel(String action) {
+        return switch (action) {
+            case "message" -> "给当前玩家发送聊天消息";
+            case "broadcast" -> "向全服广播消息";
+            case "console_command" -> "以控制台身份执行命令";
+            case "player_command" -> "以玩家身份执行命令";
+            case "actionbar" -> "发送 Action Bar";
+            case "title" -> "发送标题和副标题";
+            case "sound" -> "播放音效";
+            case "set_variable" -> "设置运行时变量";
+            case "log" -> "写入插件日志";
+            case "client_action" -> "向客户端 Mod 发送动作";
+            case "client_message" -> "向客户端显示消息";
+            case "client_screen" -> "控制客户端界面";
+            case "client_overlay" -> "显示客户端覆盖层";
+            case "client_sound" -> "播放客户端音效";
+            default -> "动作";
+        };
+    }
+
+    private static String defaultContent(String action) {
+        return switch (action) {
+            case "message" -> "&a欢迎回来，%player_name%！";
+            case "broadcast" -> "&e服务器公告：欢迎大家！";
+            case "console_command" -> "say %player_name% 触发了监听器";
+            case "player_command" -> "spawn";
+            case "actionbar" -> "&b监听器已触发";
+            case "title" -> "&6欢迎|&f%player_name%";
+            case "sound", "client_sound" -> "minecraft:block.note_block.chime,1.0,1.0";
+            case "set_variable" -> "server_label=生存服务器";
+            case "log" -> "玩家 %player_name% 触发了监听器";
+            case "client_action" -> "overlay|欢迎，%player_name%！";
+            case "client_message" -> "欢迎，%player_name%！";
+            case "client_screen" -> "inventory";
+            case "client_overlay" -> "欢迎，%player_name%！";
+            default -> "&f监听器已触发";
+        };
+    }
+
+    private static String trimForLore(String value) {
+        String normalized = value == null ? "" : value.replace('\n', ' ');
+        return normalized.length() <= 42 ? normalized : normalized.substring(0, 39) + "...";
+    }
+
+    /**
+     * Gives every screen a quiet visual frame so actionable items read as
+     * cards instead of floating in an empty inventory. Empty filler slots are
+     * still cancelled by the click handler and can never move items.
+     */
+    private static void fillBackground(Inventory inventory) {
+        ItemStack filler = item(Material.GRAY_STAINED_GLASS_PANE, "§r");
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            if (inventory.getItem(slot) == null) inventory.setItem(slot, filler.clone());
+        }
+    }
+
     private static ItemStack ruleItem(ListenerManager.ListenerDefinition definition) {
         Material material = definition.enabled() ? Material.LIME_DYE : Material.GRAY_DYE;
         return item(material, (definition.enabled() ? "§a" : "§7") + definition.id(),
@@ -412,9 +813,11 @@ public final class ListenerGui implements Listener {
         return stack;
     }
 
-    private enum GuiPage { MAIN, DETAIL }
+    private enum GuiPage { MAIN, DETAIL, MODE, WIZARD_EVENT, WIZARD_ACTION, WIZARD_CONTENT, WIZARD_PREVIEW }
 
-    private enum EditMode { CREATE, EDIT_EVENT, EDIT_ACTION, EDIT_INTERVAL }
+    private enum EditMode { CREATE, EDIT_EVENT, EDIT_ACTION, EDIT_INTERVAL, WIZARD }
+
+    private enum WizardStage { ID, EVENT, EVENT_CUSTOM, ACTION, CONTENT, CONTENT_CUSTOM, PREVIEW }
 
     private static final class GuiHolder implements InventoryHolder {
         private final GuiPage page;
@@ -443,6 +846,7 @@ public final class ListenerGui implements Listener {
         private String actionType;
         private String actionValue;
         private long intervalTicks;
+        private WizardStage wizardStage;
         private final Map<String, String> filters;
 
         private EditSession(EditMode mode) {
@@ -452,6 +856,12 @@ public final class ListenerGui implements Listener {
 
         private static EditSession create() {
             return new EditSession(EditMode.CREATE);
+        }
+
+        private static EditSession wizard() {
+            EditSession session = new EditSession(EditMode.WIZARD);
+            session.wizardStage = WizardStage.ID;
+            return session;
         }
 
         private static EditSession editEvent(ListenerManager.ListenerDefinition definition) {

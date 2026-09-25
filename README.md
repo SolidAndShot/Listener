@@ -50,7 +50,7 @@ build/libs/Listener-1.0.0.jar
 
 需要 `listener.admin` 权限，默认只有 OP 拥有。
 
-`/listener gui` 会打开一个简单的两级游戏内编辑器：在规则列表中左键进入详情、右键快速启停；详情页可修改事件、首个动作、定时器间隔、立即测试或新建规则。保存会自动写回 `plugins/Listener/config.yml` 并重载规则。编辑器和菜单点击会再次检查 `listener.admin`，普通玩家无法使用。
+`/listener gui` 会先打开模式选择：新手向导通过事件/动作菜单和预览页面创建规则，高级编辑则用于查看已有规则、右键启停、测试和精细调整。向导只在规则 ID 和自定义内容时使用聊天输入，保存会自动写回 `plugins/Listener/config.yml` 并重载规则。编辑器和菜单点击会再次检查 `listener.admin`，普通玩家无法使用。
 
 ## 配置示例
 
