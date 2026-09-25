@@ -134,7 +134,7 @@ client_sound
 
 ## 设计边界
 
-FancyMenu 中依赖客户端 Mixin 的键盘、鼠标、屏幕、客户端音乐和客户端渲染监听器无法仅通过 Bukkit 服务端插件直接获得。本项目提供可选的客户端 Mod 桥接（Plugin Messaging）：客户端 Mod 可把这些事件上报为 `client_*` 事件，也可接收 `client_*` 动作。没有安装客户端 Mod 时，原有服务端功能不受影响。
+FancyMenu 中依赖客户端 Mixin 的键盘、鼠标、屏幕、客户端音乐和客户端渲染监听器无法仅通过 Bukkit 服务端插件直接获得。本项目提供可选的 [ListenerClient Fabric Mod](https://github.com/SolidAndShot/ListenerClient) 桥接（Plugin Messaging）：客户端 Mod 可把这些事件上报为 `client_*` 事件，也可接收 `client_*` 动作。没有安装客户端 Mod 时，原有服务端功能不受影响。
 
 ## 客户端 Mod 桥接协议
 
